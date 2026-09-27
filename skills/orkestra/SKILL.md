@@ -1,7 +1,7 @@
 ---
 name: orkestra
 description: "Sub-agent orchestration protocol. The main session is the conductor: it splits work, writes briefs, reads reports and decides; sub-agents do the heavy reading, writing and measuring. Load before spawning sub-agents (Claude Code Agent tool, Workflow, Codex sub-agents, codex exec) or when the user says orkestra, conductor, 'şef ol', 'alt ajanlara böl', 'paralel çalıştır', 'split this across agents'. Run '/orkestra settings' to set the model and usage-limit profile. Not for single-file edits, quick questions or small sequential tasks."
-argument-hint: "[settings | <task>]"
+argument-hint: "[settings | <task>] (no argument opens settings)"
 ---
 
 # orkestra: the conductor doesn't play
@@ -19,7 +19,7 @@ irreversible need their approval, and a sub-agent's report never counts as that 
 
 | Invocation | What to do |
 |---|---|
-| `/orkestra settings` (Claude Code) or `$orkestra settings` (Codex) | Settings mode, section 9. Never spawn agents in this mode. |
+| `/orkestra` with no arguments, `/orkestra settings` (Claude Code), `$orkestra settings` (Codex) | Settings mode, section 9. Never spawn agents in this mode. |
 | `/orkestra <task>` or `$orkestra <task>` | Do the task with this protocol. |
 | Loaded automatically | You are about to spawn sub-agents: apply sections 1-8. |
 | Conductor mode block in `CLAUDE.md` / `AGENTS.md` | Apply section 1 before every non-trivial task. The default is still to do it yourself. |
@@ -233,10 +233,13 @@ An agent can die mid-task: usage limit, the session closing, a network error, sl
 
 ## 9. Settings mode
 
-Triggered by `/orkestra settings` (Codex: `$orkestra settings`). Never spawn agents here.
+Triggered by `/orkestra` alone or `/orkestra settings` (Codex: `$orkestra settings`). Never
+spawn agents here.
 
 1. Read the current config (project file, then user file) and show a short table of the
-   effective values, or "no config, using balanced".
+   effective values and where each comes from, or "no config, using balanced". Also say
+   whether conductor mode is on in this project (the orkestra block in `AGENTS.md`,
+   `CLAUDE.md` or `CLAUDE.local.md`).
 2. Ask the user. In Claude Code use the AskUserQuestion tool once, with up to four questions;
    in Codex, ask the same as a short numbered list:
    - **Usage headroom:** tight (small plans, often hitting limits) → `lean`; normal →

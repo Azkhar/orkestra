@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1 (2026-09-27)
+
+- `/orkestra` with no arguments opens settings mode (it was undefined; found on first real
+  use). Settings mode now also reports whether conductor mode is on in the project.
+
 ## 0.2.0 (2026-09-27)
 
 - Skill rewritten in English; the description keeps Turkish trigger phrases and the agent
