@@ -172,6 +172,11 @@ fixes were proven by turning six mutants red.
   ([swarm-orchestrator](https://github.com/moonrunnerkc/swarm-orchestrator)); on-disk state
   for work that spans sessions ([open-bridge](https://github.com/bks-lab/open-bridge)).
 
+## Maintainers
+
+- Hakan Temur ([@Azkhar](https://github.com/Azkhar))
+- Emir OĞUZ ([@Ranork](https://github.com/Ranork))
+
 ## Contributing
 
 Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: tests on

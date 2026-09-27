@@ -76,6 +76,13 @@ Fikir Avenox'un "Bir kişi. Bir orkestra." anlatımından geldi
 ([video](https://www.youtube.com/watch?v=MFqtKpzttGA), [sunum](https://avenox.lol/orkestrasyon/)).
 Diğer kaynaklar için [İngilizce README](README.md#-credits).
 
+## Geliştirenler
+
+- Hakan Temur ([@Azkhar](https://github.com/Azkhar))
+- Emir OĞUZ ([@Ranork](https://github.com/Ranork))
+
+Katkı kuralları: [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Lisans
 
 [MIT](LICENSE)
