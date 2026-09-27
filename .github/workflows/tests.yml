@@ -1,0 +1,37 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer tests (PowerShell 7)
+        shell: pwsh
+        run: pwsh -NoProfile -File tests/test-install.ps1
+      - name: Installer tests (Windows PowerShell 5.1)
+        shell: pwsh
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tests/test-install.ps1
+      - name: Installer tests (Git Bash)
+        shell: bash
+        run: bash tests/test-install.sh
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer tests (bash)
+        run: bash tests/test-install.sh
+      - name: Presets in config.md match templates
+        run: python3 tests/check-presets.py
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer tests (system bash 3.2)
+        run: /bin/bash tests/test-install.sh

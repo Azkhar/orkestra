@@ -12,7 +12,7 @@ every result.
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-d97757)
 ![Codex](https://img.shields.io/badge/Codex-skill-10a37f)
-![Tests](https://img.shields.io/badge/installer%20tests-pwsh%207%20%7C%20PS%205.1%20%7C%20bash-success)
+[![tests](https://github.com/Azkhar/orkestra/actions/workflows/tests.yml/badge.svg)](https://github.com/Azkhar/orkestra/actions/workflows/tests.yml)
 
 [Türkçe](README.tr.md) · [Install with one prompt](#-install-with-one-prompt) · [How it works](#-how-it-works) · [Settings](#%EF%B8%8F-settings)
 
@@ -171,6 +171,11 @@ fixes were proven by turning six mutants red.
   ([Koryakov/Skills](https://github.com/Koryakov/Skills)); measurable acceptance criteria
   ([swarm-orchestrator](https://github.com/moonrunnerkc/swarm-orchestrator)); on-disk state
   for work that spans sessions ([open-bridge](https://github.com/bks-lab/open-bridge)).
+
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: tests on
+three shells, "turn it red" for every new test, and a second pair of eyes on every change.
 
 ## License
 

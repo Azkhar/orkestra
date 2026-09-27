@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- CI on Windows (PowerShell 7 and 5.1, Git Bash), Linux and macOS (system bash 3.2).
+- `CONTRIBUTING.md` and a pull request template.
+
 ## 0.2.1 (2026-09-27)
 
 - `/orkestra` with no arguments opens settings mode (it was undefined; found on first real
