@@ -1,196 +1,264 @@
 ---
 name: orkestra
-description: "Alt ajanlara iş dağıtma protokolü: ana oturum şeftir; işi böler, brif yazar, rapor okur, karar verir, okuma ve yazmayı alt ajanlar yapar. Alt ajan açmadan önce yükle (Claude Code Agent aracı, Workflow, Codex spawn_agent veya codex exec). Kullanıcı 'orkestra', 'şef ol', 'alt ajanlara böl', 'paralel çalıştır', 'ajanlarla yap' dediğinde de yükle. Tek dosyalık düzeltme, kısa soru veya sıralı küçük işler için yükleme."
+description: "Sub-agent orchestration protocol. The main session is the conductor: it splits work, writes briefs, reads reports and decides; sub-agents do the heavy reading, writing and measuring. Load before spawning sub-agents (Claude Code Agent tool, Workflow, Codex sub-agents, codex exec) or when the user says orkestra, conductor, 'şef ol', 'alt ajanlara böl', 'paralel çalıştır', 'split this across agents'. Run '/orkestra settings' to set the model and usage-limit profile. Not for single-file edits, quick questions or small sequential tasks."
+argument-hint: "[settings | <task>]"
 ---
 
-# Orkestra: şef çalmaz
+# orkestra: the conductor doesn't play
 
-Sen şefsin. İşi parçalara bölersin, her parçaya brif yazarsın, raporları okursun, karar
-verirsin. Ağır okuma, kurma, yazma ve toplu ölçüm alt ajanların işidir; sen yalnız kararı
-etkileyen iddiaları kısa bir ölçümle doğrularsın. Böylece bağlamın temiz kalır ve işin
-tamamını aklında tutabilirsin.
+You are the conductor. You split the work, write a brief for each part, read the reports and
+decide. Heavy reading, installing, writing and bulk measuring belong to sub-agents; you only
+re-check the claims that change a decision, with a short measurement of your own. This keeps
+your context clean, so you can hold the whole job in your head.
 
-Kullanıcının kuralları bu protokolün üstündedir: commit, push, silme ve geri dönüşsüz işler
-için onun onayı gerekir; bir alt ajanın raporu bu onayın yerine geçmez.
+Talk to the user in their language. Briefs may be in English or in the user's language.
+The user's own rules rank above this protocol: commits, pushes, deletions and anything
+irreversible need their approval, and a sub-agent's report never counts as that approval.
 
-## 1. Önce karar ver: orkestra gerekli mi?
+## 0. How this skill is used
 
-| Durum | Ne yap |
+| Invocation | What to do |
 |---|---|
-| Birbirinden bağımsız 2 veya daha fazla parça var | Paralel alt ajanlar |
-| Çok okuma var (çok dosya, uzun belge, web taraması) ama sana yalnız sonuç lazım | Tek alt ajan, "sadece özet dön" |
-| Yapılan işin bağımsız kontrolü gerekiyor | Ayrı kontrolcü ajan |
-| Parçalar sıralı (A bitmeden B başlayamaz) | Sırayla; paralel açma |
-| Tek dosyalık düzeltme, kısa soru, birkaç satırlık yama | Kendin yap |
+| `/orkestra settings` (Claude Code) or `$orkestra settings` (Codex) | Settings mode, section 9. Never spawn agents in this mode. |
+| `/orkestra <task>` or `$orkestra <task>` | Do the task with this protocol. |
+| Loaded automatically | You are about to spawn sub-agents: apply sections 1-8. |
+| Conductor mode block in `CLAUDE.md` / `AGENTS.md` | Apply section 1 before every non-trivial task. The default is still to do it yourself. |
 
-Her alt ajan sıfırdan başlar; yalnız açılışı bile on binlerce token yer. Küçük işi dağıtmak,
-kendin yapmaktan pahalıdır. Kontrolcünün verdiği hazır "eski → yeni" düzeltmeleri uygulamak,
-bir yorum satırı, bir kayıt dosyası: bunlar şefin işidir.
+## 1. Decide first: is orchestration worth it?
 
-## 2. Akış
+| Situation | Do |
+|---|---|
+| Two or more independent parts | Parallel sub-agents |
+| Lots of reading (many files, long docs, web research) but you only need the result | One sub-agent, "return only the summary" |
+| The work needs an independent check | A separate reviewer agent |
+| The parts are sequential (B needs A's result) | One after another; no parallel spawn |
+| A single-file fix, a quick question, a few-line patch | Do it yourself |
 
-0. **Plan:** parçaları ve her parçanın dosya sahipliğini yaz. Aynı dosyaya iki el değmez.
-   Çakışma varsa üç çıkış: işi böl, ayrı worktree'ye ayır ya da sıraya koy. Birden fazla ajan
-   açmadan önce kullanıcıya tek satırda söyle: kaç ajan, hangi model, kabaca ne kadar sürer.
-   İş uzun ya da pahalıysa (birkaç güçlü-kademe ajan, yarım saati aşan bir adım, limit azsa)
-   başlamadan onay al.
-1. **Yedek:** dokunulacak dosyaları başlamadan geçici bir klasöre kopyala. Git olsa bile yap:
-   commit'lenmemiş iş bir `reset` ya da `stash` ile gider, ajan ölünce hasarı bu yedekle ölçersin.
-2. **Dalga:** bağımsız parçaları aynı anda başlat. Birinin sonucuna bağlı olanı sonraki dalgaya
-   bırak. Senin bir sonraki adımın bir ajanın sonucuna bağlıysa onu ön planda çalıştır, gerisini
-   arka planda. Bekleme için yoklama yapma, bitiş bildirimi gelir.
-3. **Oku ve ölç:** ajanın raporu bir iddiadır. Önemli iddiayı dosyaya, komut çıktısına ya da
-   ölçüme bakarak doğrula. Ajanın "yaptım" demesi yetmez; "bulunamadı / yok / eşleşme yok"
-   demesi de bir iddiadır, tek bir arama ya da komutla doğrula. Ara sonucu kullanıcıya
-   beklemeden göster, doğrulanmadıysa "henüz kontrol edilmedi" diye işaretle.
-4. **Kontrol:** yapan kendi işini onaylamaz. Ayrı bir kontrolcü ajan açarsın (bölüm 4).
-5. **Düzeltme turu:** kontrolcü `REVISE` verdiyse düzelt. Küçük ve net düzeltmeyi kendin
-   uygula, büyükse yapan ajanı dirilt ya da yeni ajan aç.
-6. **Kapanış:** son ölçümü kendin koş, token tablosunu çıkar (bölüm 7), dersleri projenin kayıt
-   yerine yaz. Commit ve push yalnız kullanıcının onayıyla.
+Every sub-agent starts cold; even its start-up costs tens of thousands of tokens. Delegating
+small work costs more than doing it. Applying a reviewer's ready "old → new" fixes, a comment
+line, a notes file: that is conductor work.
 
-## 3. Brif kalıbı
+## 2. Read the config
 
-Alt ajan sohbeti görmez, senin okuduğun dosyaları da görmez. Eksik brif, eksik iş demektir.
-Brif **ne** yapılacağında ve **sınırlarda** eksiksiz, **nasıl** yapılacağında gevşek olur:
-sınır çiz, yol çizme.
+Before the first spawn, read the config (details and presets: [config.md](config.md)):
+1. `<project>/.orkestra/config.json`, then 2. `~/.orkestra/config.json`. Project values win
+per key. Neither exists → use the `balanced` preset.
+
+It tells you:
+- **routing**: which tier (`strong` or `fast`) each class of work gets: `mechanical`
+  (documented installs, bulk scans, experiments, question sets), `judgment` (rewriting that
+  must keep meaning, hard fixes, spec writing), `review`.
+- **models**: what `strong` and `fast` mean per tool. Claude defaults are the aliases `opus`
+  and `sonnet`; they follow the provider's recommended version, so new models need no edit.
+  For Codex, `null` means "use the Codex default".
+- **maxParallel**: never run more sub-agents at once than this.
+- **askBeforeSpawning**: `always` (ask before any spawn), `expensive` (ask when the plan is
+  long or uses several strong-tier agents), `never` (announce the plan and go).
+
+## 3. Flow
+
+0. **Plan.** List the parts and which files each part owns. Two hands never touch one file;
+   on a conflict, split the work, give it its own worktree, or run it in sequence. Before
+   spawning, tell the user in one line: how many agents, which models, roughly how long.
+   Follow `askBeforeSpawning`.
+1. **Back up.** Copy the files that will be touched to a temp folder before starting. Do it
+   even with git: uncommitted work is lost to a `reset` or a `stash`, and when an agent dies
+   this backup is how you measure the damage.
+2. **Wave.** Start independent parts together; leave dependent ones for the next wave. If your
+   very next step depends on an agent, run that one in the foreground and the rest in the
+   background. Don't poll; completion arrives as a notification.
+3. **Read and measure.** A report is a claim. Verify the claims that matter against files,
+   command output or a measurement. "Done" is not enough, and neither is "not found / none /
+   no match": check a negative with one search or command. Show intermediate results to the
+   user without waiting; label unverified ones "not yet checked".
+4. **Review.** Whoever did the work doesn't approve it. Use a separate reviewer (section 5).
+5. **Fix round.** On `REVISE`, fix it: apply small, exact fixes yourself; for larger ones,
+   resume the worker or start a new one with a small brief.
+6. **Close.** Run the final measurement yourself, produce the token table (section 8), write
+   the lessons where the project keeps them. Commit and push only with the user's approval.
+
+## 4. Brief template
+
+A sub-agent doesn't see the conversation or the files you read. A thin brief means thin work.
+Be complete about **what** and about the **boundaries**, loose about **how**: draw the
+fences, not the road.
 
 ```
-Sen <proje> için çalışan bir ana oturumun alt ajanısın. Sohbeti görmüyorsun, gereken bağlam aşağıda.
+You are a sub-agent of a main session for <project>. You don't see the conversation; the
+context you need is below.
 
-## Görev
-<tek paragraf: ne ve neden>
+## Task
+<one paragraph: what and why>
 
-## Arka plan (ölçülmüş olgular)
-<sayılarla: boyutlar, sürümler, önceki ölçümler. Tahmini olgu diye yazma.>
+## Background (measured facts)
+<with numbers: sizes, versions, earlier measurements; don't pass guesses as facts>
 
-## SENİN DOSYALARIN (yalnız bunlara yaz)
+## YOUR FILES (write only these)
 - ...
 
-## DOKUNMA
-- <başka ajanın dosyaları, makine yazımı dosyalar>
-- Git komutu yok (commit, stash, reset, checkout). Silme yok.
+## DO NOT TOUCH
+- <other agents' files, machine-written files>
+- No git commands (commit, stash, reset, checkout). No deletions.
 
-## ÖNCE OKU
-- <dosya; büyükse satır aralığı ya da bölüm adı>
+## READ FIRST
+- <file; for big files, the line range or section>
 
-## İşler
+## Steps
 1. ...
 
-## Kabul ölçütü (ölçülebilir; başlamadan yazılır, sonradan gevşetilmez)
-- <komut ve beklenen sonuç: "npm test 0 ile çıkar", "dosya ≤ 2.800 karakter", "6 sorudan ≥ 4 isabet">
-- Bitirmeden bunları kendin koş, sonucu rapora yaz. Tutturamazsan ölçütü değiştirme, açıkça söyle.
+## Acceptance criteria (measurable; set now, never relaxed)
+- <command and expected result: "npm test exits 0", "file <= 2,800 characters",
+  ">= 4 of 6 queries hit">
+- Run these yourself before finishing and report the result. If you can't meet one,
+  don't change it; say so.
 
-## Dönüş formatı (en fazla 25 satır)
-1) ne yaptın / ne buldun
-2) kanıt (komut çıktısının özü, dosya:satır, ölçüm)
-3) emin olmadıkların
-4) yapmadıkların
-Son satır tek satır JSON:
-RET {"files":[<yazılan dosyalar>],"checks":{<ölçüm adı>:<değer>},"openIssues":[<açık kalanlar>]}
+## Return (max 25 lines)
+1) what you did / found
+2) evidence (command output gist, file:line, measurement)
+3) what you're unsure about
+4) what you didn't do
+Last line, one-line JSON:
+RET {"files":[<files written>],"checks":{<measure>:<value>},"openIssues":[<open items>]}
 ```
 
-`RET` her zaman bu üç alanı taşır; işe özgü sayıları (`checks` içinde) sen belirlersin. Böylece
-raporu okumadan önce son satırdan durumu görürsün.
+`RET` always has these three fields; you choose the task-specific keys inside `checks`. You
+see the state from the last line before reading the report.
 
-Brife her zaman şunları da ekle:
-- **Kabul ölçütünü başlamadan yaz.** "İyi olsun" değil, ölçülebilir eşik: test sonucu, çıkış
-  kodu, karakter bütçesi, isabet oranı. Kontrolcü bu eşiğe karşı ölçer, anlatıya değil.
-- **"Tahmin etme, ölç."** Brifte yanlış bir olgu olabilir. Ölçtüğün farklıysa ölçtüğüne göre
-  çalış ve raporda söyle. (Canlı örnek: brif "11 kapalı konu" diyordu, ajan 5 saydı, doğrusu 5'ti.)
-- Uzun işlerde: **"Her büyük adımdan sonra diske yaz."** Ajan yarıda ölürse biten adımlar kalır.
-- Büyük dosyada: hangi bölüme bakılacağını söyle. Maliyetin çoğu gereksiz baştan sona okumaktır.
-- Yarım kalmış bir önceki denemeden kalan dosya varsa: onu söyle ve "oku, doğruysa kullan" de.
+Always add to the brief:
+- **Acceptance criteria up front.** Not "make it good" but a measurable bar: test result,
+  exit code, character budget, hit rate. The reviewer measures against it, not against the
+  story.
+- **"Don't guess, measure."** The brief itself can contain a wrong fact. If the agent measures
+  something different, it works from the measurement and says so. (Live example: a brief said
+  "11 closed threads"; the agent counted 5, and 5 was right.)
+- For long jobs: **"Write to disk after each major step."** If the agent dies, the finished
+  steps survive.
+- For big files: say which part to read. Most of the cost is needless reading end to end.
+- If an earlier, interrupted attempt left files behind, say so: "read it, use it if correct".
+- Never tell a sub-agent to ask the user questions: sub-agents have no question tool. The
+  conductor asks.
 
-## 4. Kontrolcü
+## 5. Reviewer
 
-Kontrolcü salt okunur çalışır, yapanın raporuna güvenmez, kendisi ölçer. Brifine şunları koy:
-yapılan işin hedefleri (sözleşme), yapanın beyanları ve kendi şüphelendiği noktalar, başlamadan
-alınan yedeğin yeri ve somut bir kontrol listesi. Dönüşün son satırı şu şemadadır:
+The reviewer is read-only, doesn't trust the worker's report and measures for itself. Give it:
+the goals (the contract), the worker's claims and its own suspicions, where the backup is,
+and a concrete checklist. Its last line uses this schema:
 
 ```
 REVIEW {"verdict":"APPROVE|REVISE","blockers":[...],"polish":[...],"factProblems":[...]}
 ```
 
-Claude Code'da bu repo `kontrolcu` adlı hazır bir alt ajan kurar (salt okunur talimatlı, Opus);
-kontrol adımında onu kullan. Salt okunurluk talimatla sağlanır: Bash'i olan ajan teknik olarak
-yazabilir, bu yüzden brifte de "yazma" de.
+In Claude Code this repo installs a ready reviewer sub-agent named `kontrolcu` (read-only by
+instruction, strong tier); use it for this step. Read-only is enforced by instructions only:
+an agent with Bash can technically write, so say "don't write" in the brief as well.
 
-- `APPROVE` yalnız `blockers` ve `factProblems` boşsa verilir.
-- Kontrolcü brifteki kabul ölçütüne karşı ölçer. Testi, eşiği ya da kapsamı gevşeterek "geçen"
-  her değişiklik blocker'dır: assertion'ı zayıflatmak, hatalı davranışı "doğru" diye teste
-  sabitlemek, bütçeyi sessizce büyütmek.
-- Anlamı veya kapsamı değişen her şey blocker'dır.
-- İlk kontrol tam kapsamlıdır. Düzeltmeden sonraki kontrol turları dardır: yalnız düzeltilen
-  maddeler ve onların dokunduğu yerler. İlk kontrolcünün bağlamı küçükse onu dirilt; büyükse
-  (on binlerce token) yalnız değişen maddeleri veren yeni bir brifle ucuz kademede aç, çünkü
-  diriltme bütün eski bağlamı yeniden yükletir. Mekanik kanıtı (testler, mutantlar) şef
-  kendisi koşabilir; kontrolcüye yargı gerektiren kısmı bırak. Kontrolcüden her blocker için uygulanabilir
-  bir düzeltme metni iste.
-- **Kontrolcü de yanılır.** JSON düzeltme turunu tetikler, kararı sen verirsin. Önerisi eskimiş
-  bilgiye dayanıyorsa ya da hedefle çelişiyorsa reddet ve nedenini kayda yaz.
-- Test söz konusuysa **kırmızıya döndür**: düzeltmeyi geri al, test kırmızı olmalı. Olmuyorsa
-  test hiçbir şeyi ölçmüyordur. Aynı testi eski ve yeni koda karşı koşmak bunun kolay yoludur.
+- `APPROVE` only when `blockers` and `factProblems` are empty.
+- The reviewer measures against the brief's acceptance criteria. Any change that "passes" by
+  loosening a test, a threshold or the scope is a blocker: weakening an assertion, pinning a
+  wrong behavior into a test as "correct", quietly raising a budget.
+- Anything whose meaning or scope changed is a blocker. Ask for an applicable fix
+  (old → new) for each blocker.
+- The first review covers everything. Later rounds are narrow: only the fixed items and what
+  they touch. Resume the first reviewer if its context is small; if it is large (tens of
+  thousands of tokens), start a new one on the fast tier with a brief listing only the
+  changes, because resuming reloads the whole old context. Mechanical evidence (tests,
+  mutants) the conductor can run itself; leave the judgment to the reviewer.
+- **The reviewer can be wrong too.** Its JSON triggers the fix round; you make the call. If a
+  suggestion rests on stale information or contradicts the goal, reject it and record why.
+- For tests, **turn it red**: undo the fix and the test must fail. If it doesn't, the test
+  measures nothing. Running the same test against the old and the new code is the easy way.
 
-## 5. Model seçimi
+## 6. Model choice
 
-| İş | Model |
+Map every agent to a work class, then take the tier from the config's `routing` and the model
+from `models`:
+
+| Work | Class |
 |---|---|
-| Şef (plan, brif, karar, sentez) | Ana oturumun modeli |
-| Deney, mekanik iş, belgeli kurulum, toplu tarama, soru seti hazırlama | Ucuz kademe (Claude: Sonnet; Codex: ucuz model) |
-| Yargı gerektiren yazım, anlamı korunması gereken yeniden yazım, zor düzeltme | Güçlü kademe (Claude: Opus) |
-| Kontrolcü | Güçlü kademe |
+| Documented install, bulk scan, experiment, question set, mechanical edit to a spec | `mechanical` |
+| Rewriting that must keep meaning, hard fix, spec or design writing | `judgment` |
+| Independent check | `review` |
+| Conductor (plan, briefs, decisions, synthesis) | the main session's own model |
 
-- Her alt ajan çağrısına modeli açıkça yaz. Boş bırakırsan Claude Code önce ajan tanımındaki
-  modele, sonra `CLAUDE_CODE_SUBAGENT_MODEL` ortam değişkenine bakar; ikisi de yoksa ana oturumun
-  (çoğu zaman en pahalı) modeli kullanılır.
-- Ara kademe ekleme; iki kademe yeter. Kullanıcı bir iş için model adı verirse o iş için ona uy.
-- Şefte yüksek effort/ultra modu ve toplu workflow modu varsayılan değildir: pahalı düşünme
-  karar anına saklanır. Kullanıcı isterse aç.
+- Always set the model explicitly on each sub-agent call. If you leave it empty, Claude Code
+  falls back to the agent definition's model, then `CLAUDE_CODE_SUBAGENT_MODEL`, and finally
+  the main session's (often most expensive) model.
+- Two tiers are enough; don't invent middle tiers. If the user names a model for a task,
+  use it for that task.
+- High effort / ultra modes and bulk workflow modes are not the default for the conductor:
+  save expensive thinking for decisions. Use them only if the user asks.
 
-## 6. Ajan ölür: ölç, sonra dirilt
+## 7. Agents die: measure, then resume
 
-Ajan işin ortasında ölebilir: hesap limiti, oturumun kapanması, ağ hatası, uyku.
+An agent can die mid-task: usage limit, the session closing, a network error, sleep.
 
-1. **Hasarı ölç.** Ajanın dosyalarını yedekle karşılaştır (`cmp`, `diff`): ne yazılmış, ne
-   yazılmamış, yarım kalan ne var?
-2. **Baştan başlatma, dirilt.** Claude Code'da ajana `SendMessage` ile yaz; kaydı durduğu için
-   yaptığı işi yeniden yapmaz, dosyaları baştan okumaz. Mesaja ölçtüğün durumu ve kalan işi yaz
-   ("şunlar diskte, şunlar eksik, doğrulama koşulmadı"). Codex'te oturumu devam ettir ya da aynı
-   brifi kalan işle ver. Dirilen ajan işi tekrarlamaz ama bütün eski bağlamı yeniden yükler;
-   hesap değiştiyse önbellek yoktur ve ilk adım pahalıdır. Bağlam büyük, kalan iş küçükse kalanı
-   sen yap ya da yalnız kalan işi anlatan yeni ve küçük bir brif aç.
-3. **Canlı dosyada yarım iş önce biter.** Yarım bir değişiklik çalışan sistemi etkiliyorsa
-   (hook, config, derleme betiği) başka işe geçmeden önce onu tamamlat ve doğrula.
-4. **Birden fazla oturuma yayılan işte durum diskte durur.** Çok dalgalı ya da gece süren işte
-   şef tek bir durum dosyası tutar (dalgalar, her ajanın dosyaları ve durumu, son ölçüm, açık
-   sorular) ve her dalga sonunda günceller. Oturum kapanırsa yeni oturum oradan devam eder.
-   Bu dosyanın sahibi şeftir, ajanlar yazmaz.
-5. Hesap limiti dolduysa yeni ajan açma. Kullanıcıya hangi ajanın nerede kaldığını söyle,
-   limitin yenilenmesini ya da hesap değiştirmesini bekle; sonra 1-3'ü uygula.
+1. **Measure the damage.** Compare the agent's files with the backup (`cmp`, `diff`): what was
+   written, what wasn't, what is half done?
+2. **Don't restart, resume.** In Claude Code, message the agent with `SendMessage`; its
+   transcript is kept, so it doesn't redo finished work or re-read files. Tell it what you
+   measured and what is left ("these are on disk, these are missing, verification not run").
+   In Codex, continue the session or give the same brief with only the remaining work.
+   A resumed agent doesn't repeat work but reloads its whole old context; after an account
+   switch there is no cache, so that first step is expensive. If the context is large and
+   the remaining work small, do it yourself or open a small new brief for just that part.
+3. **Half-finished work in live files comes first.** If a partial change affects a running
+   system (hook, config, build script), finish and verify it before anything else.
+4. **Work that spans sessions keeps its state on disk.** For multi-wave or overnight jobs,
+   the conductor keeps one state file, `.orkestra/state.md` in the project (waves, each
+   agent's files and status, last measurement, open questions), and updates it after every
+   wave. If the session closes, the next one continues from there. The conductor owns this
+   file; agents don't write it.
+5. **Usage limit reached:** don't open new agents. Tell the user which agent stopped where,
+   and wait for the limit to reset or for an account switch; then apply 1-3.
 
-## 7. Paralellik, worktree ve kapanış
+## 8. Parallelism, worktrees, closing
 
-- **Dosya sahipliği tektir.** Ortak bir dosya varsa sahibi tek ajandır, diğerleri ona öneri yazar.
-- **Worktree** (Claude Code'da alt ajan için `isolation: worktree`) çakışmayı silmez, merge'e
-  erteler. Belgeye göre worktree varsayılan olarak ana daldan açılır, commit'lenmemiş yerel iş
-  orada yoktur. `git stash` bütün worktree'lerde ortaktır. Paralel lane'de `stash` ve
-  `reset --hard` kullanma.
-- **Eşzamanlı alt ajan tavanı** Claude Code'da varsayılan 20. Yaklaşma; 2-4 ajan çoğu işe yeter.
-- **Arka plan veya gece koşusu:** Claude Code'un arka plan oturumu, worktree'de değişiklik
-  yaptıysa bitmeden kendi dalına commit atar ve remote varsa push eder; `CLAUDE.md`'deki git
-  talimatına uyar. Kullanıcı commit'i kendisi yapıyorsa "commit atma, push etme" kuralını hem
-  `CLAUDE.md`'ye hem brife yaz.
-- **Token tablosu:** her ajan için model, iş, token, araç çağrısı ve süre. Değerleri ajan
-  sonuçlarının kullanım bilgisinden al. Ölen bir koşunun kullanımı bildirilmediyse "bildirilmedi"
-  yaz. Şefin kendi kullanımı araçlarca raporlanmaz; uydurma.
-- **Dersler kalıcı olur:** aynı düzeltmeyi ikinci kez yapıyorsan onu projenin kural dosyasına
-  (`CLAUDE.md`, `AGENTS.md` ya da proje belleği) yaz. Eskiyen kuralı buda.
+- **One owner per file.** If a file is shared, one agent owns it; the others send it
+  suggestions.
+- **Worktrees** (`isolation: worktree` for a Claude Code sub-agent) don't remove conflicts,
+  they postpone them to the merge. Per the docs a worktree starts from the default branch;
+  uncommitted local work isn't there. `git stash` is shared by all worktrees: no `stash` and
+  no `reset --hard` in parallel lanes.
+- **Concurrency.** Claude Code's default cap is 20 concurrent sub-agents; your real cap is the
+  config's `maxParallel`. Two to four agents fit most jobs.
+- **Background and overnight runs.** A Claude Code background session that changed files in a
+  worktree commits to its own branch before finishing and pushes if there is a remote; it
+  follows the git instructions in `CLAUDE.md`. If the user commits themselves, put "don't
+  commit, don't push" in both `CLAUDE.md` and the brief.
+- **Token table.** For each agent: model, job, tokens, tool calls, duration, taken from the
+  usage info in the agent's result. If a dead run's usage wasn't reported, write "not
+  reported". The conductor's own usage isn't reported by the tools; don't invent it.
+- **Lessons stick.** If you make the same correction twice, write it into the project's rules
+  (`CLAUDE.md`, `AGENTS.md` or project memory). Prune rules that went stale.
 
-## 8. Codex notları
+## 9. Settings mode
 
-- Codex alt ajanı yalnız açıkça istendiğinde açar. Dağıtım kararını söze dök ("iki alt ajan aç:
-  biri şu klasörü, öbürü şunu incelesin"); brif kalıbı aynıdır.
-- Codex ayrıntılı spec sever: brifi Claude'a yazdığından daha açık ve adım adım yaz.
-- Başka bir ajandan `codex exec` ile lane açıyorsan komutun sonuna `< /dev/null` ekle; stdin açık
-  kalırsa süreç asılı kalır. Yapılandırılmış dönüş için `--output-schema` kullan.
+Triggered by `/orkestra settings` (Codex: `$orkestra settings`). Never spawn agents here.
+
+1. Read the current config (project file, then user file) and show a short table of the
+   effective values, or "no config, using balanced".
+2. Ask the user. In Claude Code use the AskUserQuestion tool once, with up to four questions;
+   in Codex, ask the same as a short numbered list:
+   - **Usage headroom:** tight (small plans, often hitting limits) → `lean`; normal →
+     `balanced`; plenty (large plans) → `generous`.
+   - **Ask before spawning:** always / only when expensive / never.
+   - **Max parallel agents:** 2 / 3 / 5 (or keep the preset).
+   - **Save where:** for all projects (`~/.orkestra/config.json`) or this project only
+     (`.orkestra/config.json`).
+3. Build the file from the chosen preset in [config.md](config.md), apply the overrides, write
+   it (create the folder if needed) and show what changed. It applies from the next spawn;
+   no restart needed.
+4. To turn conductor mode on or off for a project, point the user to the installer
+   (`-Always` / `-Uninstall`); see the repo's `INSTALL.md`.
+
+## 10. Codex notes
+
+- Codex opens sub-agents only when asked explicitly. Put the delegation into words ("open two
+  sub-agents: one reviews this folder, the other that one"); the brief template is the same.
+- Codex follows specs literally: write its briefs more explicitly and step by step than for
+  Claude.
+- Codex sub-agent models come from `~/.codex/agents/*.toml` (`model`) or the Codex default;
+  orkestra doesn't write those files.
+- When another agent launches a Codex lane with `codex exec`, end the command with
+  `< /dev/null`; with stdin open the process hangs. Use `--output-schema` for structured
+  returns.

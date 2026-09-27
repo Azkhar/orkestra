@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "profile": "balanced",
+  "routing": { "mechanical": "fast", "judgment": "strong", "review": "strong" },
+  "models": {
+    "claude": { "strong": "opus", "fast": "sonnet" },
+    "codex": { "strong": null, "fast": null }
+  },
+  "maxParallel": 3,
+  "askBeforeSpawning": "expensive"
+}

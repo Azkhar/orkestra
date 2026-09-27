@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "profile": "lean",
+  "routing": { "mechanical": "fast", "judgment": "fast", "review": "fast" },
+  "models": {
+    "claude": { "strong": "opus", "fast": "sonnet" },
+    "codex": { "strong": null, "fast": null }
+  },
+  "maxParallel": 2,
+  "askBeforeSpawning": "always"
+}
