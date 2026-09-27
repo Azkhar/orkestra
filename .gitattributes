@@ -1,0 +1,2 @@
+# Kabuk betikleri her platformda LF kalmalı; CRLF ile macOS/Linux'ta çalışmaz.
+*.sh text eol=lf

@@ -1,0 +1,11 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Kurulum betiğinin bıraktığı yedekler (repo içinde test edilirse)
+*.bak-*
+
+# Editör
+.vscode/
+.idea/
