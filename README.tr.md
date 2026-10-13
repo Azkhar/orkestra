@@ -8,6 +8,10 @@
 böler, sıkı brifler yazar, kısa raporları okur ve karar verir. Okumayı, yazmayı ve ölçmeyi
 alt ajanlar yapar; her sonucu bağımsız bir kontrolcü denetler.
 
+Neden önemli, ölçüldü: bütçesiz iki araştırma ajanı 75,5 milyon token işleyip 30 dakikada plan
+limitine takıldı; bütçeyle biri kendi yarısını 7,05 milyon tokenle yeniden yaptı
+([vaka notu](docs/field-notes/2026-10-13-research-budget.md), İngilizce).
+
 [English](README.md) · [Tek cümleyle kurulum](#-tek-cümleyle-kurulum) · [Ayarlar](#%EF%B8%8F-ayarlar)
 
 </div>
@@ -61,6 +65,29 @@ soru gelir ve ayar dosyası senin yerine yazılır.
 
 Claude Code'da hızlı = `sonnet`, güçlü = `opus`. Bunlar sağlayıcının önerdiği sürümü izleyen
 takma adlar; yeni model çıkınca bir şey değiştirmen gerekmez.
+
+## 💸 Bütçeler
+
+Çağrı bütçesi token bütçesi değildir. Her istek (her araç çağrısı turu bir istektir) ajanın
+bütün bağlamını yeniden gönderir, yani token ≈ istek sayısı × bağlam boyu. Bir saha koşusunda bütçesiz iki araştırma
+ajanı, ikisi birlikte 75,5 milyon token işledikten sonra yaklaşık 30 dakikada plan limitine
+takıldı; birinin bütçeli yeniden koşusu 7,05 milyon token işledi. Bu yüzden her brifte
+profilden doldurulan bir Budget bölümü var:
+
+| | `lean` | `balanced` | `generous` |
+|---|---|---|---|
+| Ajan başına araç / web çağrısı | 25 / 6 | 40 / 10 | 60 / 15 |
+| Çağrı başına çıktı | ~2.000 karakter | ~2.000 karakter | ~4.000 karakter |
+| Baştan sona okunan dosya sınırı | 50 KB | 50 KB | 100 KB |
+
+Brif istemedikçe görsel okunmaz; toplu metin işini betikler yapar; indirilen her şey indeksli
+tek bir ortak kaynak klasörüne girer; ajanlar her adımdan sonra diske not yazar. Şef her
+dalgadan önce tokeni tahmin eder, bağlamı büyük ölü ajanı diriltmek yerine küçük yeni bir brif
+açar ve iş bir token tablosuyla kapanır. Ölçümde çıkan bir sürpriz: Claude Code'un görev
+bildirimindeki token sayısı ajanın kullanımı değil, bittiği andaki bağlam boyu; transkript
+üzerinden toplanınca bir ajan genellikle bunun 25 katını işliyor. Ayrıntılar:
+[reference.md](skills/orkestra/reference.md); kaynaklar: [docs/research](docs/research/2026-10-token-budget.md).
+Neyin değiştiği, neyin hâlâ açık olduğu: [vaka notu](docs/field-notes/2026-10-13-research-budget.md).
 
 ## 🔬 Gerçek bir koşudan doğdu
 

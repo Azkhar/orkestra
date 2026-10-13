@@ -24,6 +24,9 @@ irreversible need their approval, and a sub-agent's report never counts as that 
 | Loaded automatically | You are about to spawn sub-agents: apply sections 1-8. |
 | Conductor mode block in `CLAUDE.md` / `AGENTS.md` | Apply section 1 before every non-trivial task. The default is still to do it yourself. |
 
+The reasons behind the rules, measured numbers, helper scripts and the Codex notes are in
+[reference.md](reference.md). Read only the section you need.
+
 ## 1. Decide first: is orchestration worth it?
 
 | Situation | Do |
@@ -34,9 +37,9 @@ irreversible need their approval, and a sub-agent's report never counts as that 
 | The parts are sequential (B needs A's result) | One after another; no parallel spawn |
 | A single-file fix, a quick question, a few-line patch | Do it yourself |
 
-Every sub-agent starts cold; even its start-up costs tens of thousands of tokens. Delegating
-small work costs more than doing it. Applying a reviewer's ready "old → new" fixes, a comment
-line, a notes file: that is conductor work.
+Every sub-agent starts cold: about 40K tokens of context before it reads anything (measured),
+resent with every request it makes. Delegating small work costs more than doing it. Applying a
+reviewer's ready "old → new" fixes, a comment line, a notes file: that is conductor work.
 
 ## 2. Read the config
 
@@ -49,18 +52,20 @@ It tells you:
   (documented installs, bulk scans, experiments, question sets), `judgment` (rewriting that
   must keep meaning, hard fixes, spec writing), `review`.
 - **models**: what `strong` and `fast` mean per tool. Claude defaults are the aliases `opus`
-  and `sonnet`; they follow the provider's recommended version, so new models need no edit.
-  For Codex, `null` means "use the Codex default".
+  and `sonnet`, which follow new releases. For Codex, `null` means "use the Codex default".
 - **maxParallel**: never run more sub-agents at once than this.
 - **askBeforeSpawning**: `always` (ask before any spawn), `expensive` (ask when the plan is
   long or uses several strong-tier agents), `never` (announce the plan and go).
+- **budget**: per-agent limits for every brief's Budget block (section 4): `toolCalls`,
+  `webCalls`, `outputChars` per call, `wholeFileKB`. Missing → take it from the `profile`
+  preset.
 
 ## 3. Flow
 
 0. **Plan.** List the parts and which files each part owns. Two hands never touch one file;
    on a conflict, split the work, give it its own worktree, or run it in sequence. Before
-   spawning, tell the user in one line: how many agents, which models, roughly how long.
-   Follow `askBeforeSpawning`.
+   spawning, tell the user in one line: how many agents, which models, roughly how long and
+   roughly how many tokens (section 8). Follow `askBeforeSpawning`.
 1. **Back up.** Copy the files that will be touched to a temp folder before starting. Do it
    even with git: uncommitted work is lost to a `reset` or a `stash`, and when an agent dies
    this backup is how you measure the damage.
@@ -100,6 +105,17 @@ context you need is below.
 - <other agents' files, machine-written files>
 - No git commands (commit, stash, reset, checkout). No deletions.
 
+## Budget (hard limits)
+- At most <toolCalls> tool calls, <webCalls> of them web calls (search, fetch, curl).
+- Each call returns at most ~<outputChars> characters: trim with head, grep, wc.
+- Files over ~<wholeFileKB> KB: search inside, never read end to end. No images unless
+  this brief asks for them.
+- Bulk text work (matching, counting, extracting) is done by a local script; only its
+  summary comes back to you.
+- Sources: check <scratch>/sources/INDEX.md before downloading; add a row per download.
+- After each major step write <notes file> with references to the source (file:line,
+  page). Out of budget: stop, write what you have, say what is left.
+
 ## READ FIRST
 - <file; for big files, the line range or section>
 
@@ -129,14 +145,30 @@ Always add to the brief:
   exit code, character budget, hit rate. The reviewer measures against it, not against the
   story.
 - **"Don't guess, measure."** The brief itself can contain a wrong fact. If the agent measures
-  something different, it works from the measurement and says so. (Live example: a brief said
-  "11 closed threads"; the agent counted 5, and 5 was right.)
-- For long jobs: **"Write to disk after each major step."** If the agent dies, the finished
-  steps survive.
-- For big files: say which part to read. Most of the cost is needless reading end to end.
+  something different, it works from the measurement and says so.
+- **The Budget block**, filled from the config's `budget`. Those numbers are ceilings: size
+  it to the job (Anthropic's research prompts give a fact-finding agent 3-10 calls, a
+  comparison 10-15 per agent); raise it only with a reason you can name.
+- **Notes on disk.** Name the notes file for each major step. If the agent dies, its work is
+  recovered from these files (section 7), not from its context.
 - If an earlier, interrupted attempt left files behind, say so: "read it, use it if correct".
 - Never tell a sub-agent to ask the user questions: sub-agents have no question tool. The
   conductor asks.
+
+Budget rules:
+- **A call budget is not a token budget.** Every request (one per round of tool calls)
+  resends the agent's whole, growing context: tokens ≈ requests × context length (measured:
+  39 budgeted calls in 21 requests processed 7M tokens).
+  The lever is stopping the growth: short outputs, search instead of reading, scripts
+  instead of the model, notes on disk instead of in context.
+- **The Budget block is an instruction, not a brake.** For a hard stop, set `maxTurns` in a
+  custom agent's frontmatter: the output comes back marked partial and can be resumed.
+  `kontrolcu` ships with one.
+- **One source cache per job.** Every download goes into `<scratch>/sources/` with a row in
+  its `INDEX.md`: path, format, page-marker convention, who fetched it, what it holds. You
+  create the index and put its path in every brief; agents look there before downloading.
+  WebFetch returns a model's extraction, lossy by design: for quotes and numbers, download
+  the page into the cache and search the text.
 
 ## 5. Reviewer
 
@@ -158,11 +190,14 @@ an agent with Bash can technically write, so say "don't write" in the brief as w
   wrong behavior into a test as "correct", quietly raising a budget.
 - Anything whose meaning or scope changed is a blocker. Ask for an applicable fix
   (old → new) for each blocker.
+- **Two tiers.** Mechanical evidence first, by script: quotes matched against the source
+  text, numbers, dates, test runs. Model judgment goes only to what the script flags and to
+  what no script can check. The reviewer writes its scripts to scratch, keeps their output
+  short and gets a Budget block like any agent.
 - The first review covers everything. Later rounds are narrow: only the fixed items and what
-  they touch. Resume the first reviewer if its context is small; if it is large (tens of
-  thousands of tokens), start a new one on the fast tier with a brief listing only the
-  changes, because resuming reloads the whole old context. Mechanical evidence (tests,
-  mutants) the conductor can run itself; leave the judgment to the reviewer.
+  they touch. Resume the first reviewer only if its context is small (section 7); otherwise
+  start a new one on the fast tier with a brief listing only the changes. Mechanical evidence
+  (tests, mutants) the conductor can run itself; leave the judgment to the reviewer.
 - **The reviewer can be wrong too.** Its JSON triggers the fix round; you make the call. If a
   suggestion rests on stale information or contradicts the goal, reject it and record why.
 - For tests, **turn it red**: undo the fix and the test must fail. If it doesn't, the test
@@ -180,9 +215,9 @@ from `models`:
 | Independent check | `review` |
 | Conductor (plan, briefs, decisions, synthesis) | the main session's own model |
 
-- Always set the model explicitly on each sub-agent call. If you leave it empty, Claude Code
-  falls back to the agent definition's model, then `CLAUDE_CODE_SUBAGENT_MODEL`, and finally
-  the main session's (often most expensive) model.
+- Always set the model explicitly on each sub-agent call. Left empty, Claude Code falls back
+  to the agent definition's model, then `CLAUDE_CODE_SUBAGENT_MODEL`, and finally the main
+  session's (often most expensive) model.
 - Two tiers are enough; don't invent middle tiers. If the user names a model for a task,
   use it for that task.
 - High effort / ultra modes and bulk workflow modes are not the default for the conductor:
@@ -192,15 +227,19 @@ from `models`:
 
 An agent can die mid-task: usage limit, the session closing, a network error, sleep.
 
-1. **Measure the damage.** Compare the agent's files with the backup (`cmp`, `diff`): what was
-   written, what wasn't, what is half done?
-2. **Don't restart, resume.** In Claude Code, message the agent with `SendMessage`; its
-   transcript is kept, so it doesn't redo finished work or re-read files. Tell it what you
-   measured and what is left ("these are on disk, these are missing, verification not run").
-   In Codex, continue the session or give the same brief with only the remaining work.
-   A resumed agent doesn't repeat work but reloads its whole old context; after an account
-   switch there is no cache, so that first step is expensive. If the context is large and
-   the remaining work small, do it yourself or open a small new brief for just that part.
+1. **Measure the damage.** Compare the agent's files with the backup (`cmp`, `diff`) and read
+   its notes files first: what was written, what wasn't, what is half done? A dead agent's
+   notes often hold half the job.
+2. **Resume only a small context.** The token number in an agent's task notification is its
+   context size at the end, which is what a resume reloads; for a dead agent without one, run
+   the usage script (reference.md) on its transcript. Small (up to ~50K tokens): in Claude
+   Code, resume it with `SendMessage`; it doesn't redo finished work, so tell it what you
+   measured and what is left. Larger: don't resume. A sub-agent's
+   cache lives five minutes, so after a limit reset or an account switch the whole context
+   is read again uncached, and it rides along on every later call. Open a new, small,
+   budgeted brief that points to the files the dead agent left, or do the rest yourself if
+   it is small. In Codex, continue the session or give the same brief with only the
+   remaining work.
 3. **Half-finished work in live files comes first.** If a partial change affects a running
    system (hook, config, build script), finish and verify it before anything else.
 4. **Work that spans sessions keeps its state on disk.** For multi-wave or overnight jobs,
@@ -208,60 +247,45 @@ An agent can die mid-task: usage limit, the session closing, a network error, sl
    agent's files and status, last measurement, open questions), and updates it after every
    wave. If the session closes, the next one continues from there. The conductor owns this
    file; agents don't write it.
-5. **Usage limit reached:** don't open new agents. Tell the user which agent stopped where,
-   and wait for the limit to reset or for an account switch; then apply 1-3.
+5. **Usage limit reached (HTTP 429):** open nothing new; every new agent draws on the same
+   limit. Tell the user which agent stopped where, and wait for the limit to reset or for an
+   account switch; then apply 1-3.
 
 ## 8. Parallelism, worktrees, closing
 
 - **One owner per file.** If a file is shared, one agent owns it; the others send it
   suggestions.
-- **Worktrees** (`isolation: worktree` for a Claude Code sub-agent) don't remove conflicts,
-  they postpone them to the merge. Per the docs a worktree starts from the default branch;
-  uncommitted local work isn't there. `git stash` is shared by all worktrees: no `stash` and
-  no `reset --hard` in parallel lanes.
-- **Concurrency.** Claude Code's default cap is 20 concurrent sub-agents; your real cap is the
-  config's `maxParallel`. Two to four agents fit most jobs.
-- **Background and overnight runs.** A Claude Code background session that changed files in a
-  worktree commits to its own branch before finishing and pushes if there is a remote; it
-  follows the git instructions in `CLAUDE.md`. If the user commits themselves, put "don't
-  commit, don't push" in both `CLAUDE.md` and the brief.
-- **Token table.** For each agent: model, job, tokens, tool calls, duration, taken from the
-  usage info in the agent's result. If a dead run's usage wasn't reported, write "not
-  reported". The conductor's own usage isn't reported by the tools; don't invent it.
+- **Worktrees** (`isolation: worktree`) don't remove conflicts, they postpone them to the
+  merge. A worktree starts from the default branch, without uncommitted local work, and the
+  stash is shared: no `stash` and no `reset --hard` in parallel lanes. A background session
+  in a worktree commits and may push on its own: if the user commits themselves, put
+  "don't commit, don't push" in both `CLAUDE.md` and the brief.
+- **One limit for everyone.** Parallel sub-agents and the main session draw on the same plan
+  limit. Before a wave, estimate per agent: processed tokens ≈ requests × (start + final
+  context) / 2 (requests ≤ tool calls), start ≈ 40K (reference.md has the growth numbers), and put the wave total in
+  the one-line plan. If the status line saves its JSON, read
+  `rate_limits.five_hour.used_percentage` before and after the first wave and extrapolate.
+  Your cap is `maxParallel` (two to four agents fit most jobs); in `lean` run in sequence or
+  at most two. On a 429, section 7.
+- **Token table.** One row per agent: model, job, tool calls, duration, final context (the
+  token number in its task notification: its context size at the end, not its usage) and
+  processed tokens (its transcript summed by the script in reference.md, typically 25×
+  more). A dead agent has no notification: sum its transcript, and if there is none, write
+  "not reported". Add a total per wave and a "tokens per deliverable" line, both from
+  processed tokens. Your own row: sum your session transcript
+  the same way, else "not measured"; never invent it. Write the table into the project's
+  lessons file.
 - **Lessons stick.** If you make the same correction twice, write it into the project's rules
   (`CLAUDE.md`, `AGENTS.md` or project memory). Prune rules that went stale.
 
 ## 9. Settings mode
 
 Triggered by `/orkestra` alone or `/orkestra settings` (Codex: `$orkestra settings`). Never
-spawn agents here.
+spawn agents here. Follow the steps in [config.md](config.md#settings-mode): show the
+effective config, ask up to four questions, write the file from the chosen preset.
 
-1. Read the current config (project file, then user file) and show a short table of the
-   effective values and where each comes from, or "no config, using balanced". Also say
-   whether conductor mode is on in this project (the orkestra block in `AGENTS.md`,
-   `CLAUDE.md` or `CLAUDE.local.md`).
-2. Ask the user. In Claude Code use the AskUserQuestion tool once, with up to four questions;
-   in Codex, ask the same as a short numbered list:
-   - **Usage headroom:** tight (small plans, often hitting limits) → `lean`; normal →
-     `balanced`; plenty (large plans) → `generous`.
-   - **Ask before spawning:** always / only when expensive / never.
-   - **Max parallel agents:** 2 / 3 / 5 (or keep the preset).
-   - **Save where:** for all projects (`~/.orkestra/config.json`) or this project only
-     (`.orkestra/config.json`).
-3. Build the file from the chosen preset in [config.md](config.md), apply the overrides, write
-   it (create the folder if needed) and show what changed. It applies from the next spawn;
-   no restart needed.
-4. To turn conductor mode on or off for a project, point the user to the installer
-   (`-Always` / `-Uninstall`); see the repo's `INSTALL.md`.
+## 10. Codex
 
-## 10. Codex notes
-
-- Codex opens sub-agents only when asked explicitly. Put the delegation into words ("open two
-  sub-agents: one reviews this folder, the other that one"); the brief template is the same.
-- Codex follows specs literally: write its briefs more explicitly and step by step than for
-  Claude.
-- Codex sub-agent models come from `~/.codex/agents/*.toml` (`model`) or the Codex default;
-  orkestra doesn't write those files.
-- When another agent launches a Codex lane with `codex exec`, end the command with
-  `< /dev/null`; with stdin open the process hangs. Use `--output-schema` for structured
-  returns.
+Before the first Codex sub-agent or `codex exec` lane, read
+[reference.md § Codex](reference.md#codex): explicit delegation, literal briefs, where the
+models come from, `< /dev/null`, and the Codex knobs that cap a sub-agent's context.

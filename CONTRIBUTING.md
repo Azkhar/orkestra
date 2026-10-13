@@ -45,8 +45,10 @@ installer once and say so in the pull request. A test that passes either way mea
 ## Rules for changes
 
 - **Presets live in two places:** `templates/profiles/*.json` (used by the installer) and the
-  JSON blocks in `skills/orkestra/config.md` (read by agents). Change both;
-  `tests/check-presets.py` fails if they drift.
+  JSON blocks in `skills/orkestra/config.md` (read by agents), whose preset table repeats the
+  `budget` values. Change all of them; `tests/check-presets.py` fails if they drift.
+- **SKILL.md is loaded into every conductor session**, so it is tokens too: keep it under
+  17,500 characters. Long examples, reasons and scripts go to `skills/orkestra/reference.md`.
 - **The conductor block** comes only from `templates/conductor-block.md`. Never hard-code it in
   the installers.
 - **Models:** use Claude aliases (`opus`, `sonnet`, `haiku`), not dated model IDs, so the skill

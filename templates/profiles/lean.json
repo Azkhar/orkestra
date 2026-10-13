@@ -7,5 +7,6 @@
     "codex": { "strong": null, "fast": null }
   },
   "maxParallel": 2,
-  "askBeforeSpawning": "always"
+  "askBeforeSpawning": "always",
+  "budget": { "toolCalls": 25, "webCalls": 6, "outputChars": 2000, "wholeFileKB": 50 }
 }

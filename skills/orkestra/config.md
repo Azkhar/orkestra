@@ -6,8 +6,10 @@
 2. `~/.orkestra/config.json`: the user's default for every project.
 
 Read the project file first, then the user file; project values win per key. If neither
-exists, use the `balanced` preset below. The installer writes the user file when it is given
-`-Profile` / `--profile`; `/orkestra settings` writes either file.
+exists, use the `balanced` preset below. A key missing from both files (for example
+`budget` in a config written before 0.3.0) comes from the preset named in `profile`, else
+from `balanced`. The installer writes the user file when it is given `-Profile` /
+`--profile`; `/orkestra settings` writes either file.
 
 ## Fields
 
@@ -22,6 +24,14 @@ exists, use the `balanced` preset below. The installer writes the user file when
 | `models.codex.strong` / `.fast` | model name or `null` | `null` = use the Codex default. Codex sub-agent models are really set in `~/.codex/agents/*.toml`. |
 | `maxParallel` | integer | Never run more sub-agents at once. |
 | `askBeforeSpawning` | `always` / `expensive` / `never` | When to ask the user before spawning. The one-line plan is announced in every case. |
+| `budget.toolCalls` | integer | Most tool calls per sub-agent, the reviewer included. |
+| `budget.webCalls` | integer | Most web calls (search, fetch, curl) within `toolCalls`. |
+| `budget.outputChars` | integer | Most characters one call may return into the agent's context; larger output is trimmed (`head`, `grep`, `wc`). |
+| `budget.wholeFileKB` | integer | Files larger than this are searched, never read end to end. |
+
+The budget goes into every brief's Budget block (SKILL.md section 4). It caps calls, not
+tokens: every request resends the agent's whole context, so the output and file-size caps
+matter as much as the call count.
 
 ## Presets
 
@@ -31,8 +41,13 @@ exists, use the `balanced` preset below. The installer writes the user file when
 | mechanical / judgment / review | fast / fast / fast | fast / strong / strong | strong / strong / strong |
 | maxParallel | 2 | 3 | 5 |
 | askBeforeSpawning | always | expensive | never |
+| `budget.toolCalls` | 25 | 40 | 60 |
+| `budget.webCalls` | 6 | 10 | 15 |
+| `budget.outputChars` | 2000 | 2000 | 4000 |
+| `budget.wholeFileKB` | 50 | 50 | 100 |
 
-In `lean`, use the strong tier only when the user asks for it.
+In `lean`, use the strong tier only when the user asks for it, and run agents one after
+another unless the parts are truly independent.
 
 The exact files (kept identical to `templates/profiles/*.json` in the repo):
 
@@ -47,7 +62,8 @@ The exact files (kept identical to `templates/profiles/*.json` in the repo):
     "codex": { "strong": null, "fast": null }
   },
   "maxParallel": 2,
-  "askBeforeSpawning": "always"
+  "askBeforeSpawning": "always",
+  "budget": { "toolCalls": 25, "webCalls": 6, "outputChars": 2000, "wholeFileKB": 50 }
 }
 ```
 
@@ -62,7 +78,8 @@ The exact files (kept identical to `templates/profiles/*.json` in the repo):
     "codex": { "strong": null, "fast": null }
   },
   "maxParallel": 3,
-  "askBeforeSpawning": "expensive"
+  "askBeforeSpawning": "expensive",
+  "budget": { "toolCalls": 40, "webCalls": 10, "outputChars": 2000, "wholeFileKB": 50 }
 }
 ```
 
@@ -77,9 +94,33 @@ The exact files (kept identical to `templates/profiles/*.json` in the repo):
     "codex": { "strong": null, "fast": null }
   },
   "maxParallel": 5,
-  "askBeforeSpawning": "never"
+  "askBeforeSpawning": "never",
+  "budget": { "toolCalls": 60, "webCalls": 15, "outputChars": 4000, "wholeFileKB": 100 }
 }
 ```
+
+## Settings mode
+
+Triggered by `/orkestra` alone or `/orkestra settings` (Codex: `$orkestra settings`). Never
+spawn agents here.
+
+1. Read the current config (project file, then user file) and show a short table of the
+   effective values and where each comes from, or "no config, using balanced". Also say
+   whether conductor mode is on in this project (the orkestra block in `AGENTS.md`,
+   `CLAUDE.md` or `CLAUDE.local.md`).
+2. Ask the user. In Claude Code use the AskUserQuestion tool once, with up to four questions;
+   in Codex, ask the same as a short numbered list:
+   - **Usage headroom:** tight (small plans, often hitting limits) → `lean`; normal →
+     `balanced`; plenty (large plans) → `generous`.
+   - **Ask before spawning:** always / only when expensive / never.
+   - **Max parallel agents:** 2 / 3 / 5 (or keep the preset).
+   - **Save where:** for all projects (`~/.orkestra/config.json`) or this project only
+     (`.orkestra/config.json`).
+3. Build the file from the chosen preset above (budget included), apply the overrides, write
+   it (create the folder if needed) and show what changed. It applies from the next spawn;
+   no restart needed.
+4. To turn conductor mode on or off for a project, point the user to the installer
+   (`-Always` / `-Uninstall`); see the repo's `INSTALL.md`.
 
 ## Changing it
 

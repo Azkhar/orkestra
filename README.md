@@ -9,6 +9,10 @@ the conductor: it splits the work, writes tight briefs, reads short reports and 
 Sub-agents do the heavy reading, writing and measuring, and an independent reviewer checks
 every result.
 
+Why it matters, measured: two research agents without a budget processed 75.5M tokens and hit
+the plan limit in 30 minutes; with a budget, one of them redid its half for 7.05M
+([field note](docs/field-notes/2026-10-13-research-budget.md)).
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-skill-d97757)
 ![Codex](https://img.shields.io/badge/Codex-skill-10a37f)
@@ -141,12 +145,37 @@ multiple-choice questions and the config is written for you.
 the provider's recommended version, so you don't edit anything when new models ship. For
 Codex the default is "use the Codex default model". Details: [config.md](skills/orkestra/config.md).
 
+## 💸 Budgets
+
+A call budget is not a token budget. Every request (one per round of tool calls) resends the
+agent's whole context, so tokens ≈ requests × context length. In a field run, two research agents without a budget hit the
+plan limit in about 30 minutes, after processing 75.5M tokens between them; the budgeted rerun
+of one of them processed 7.05M. So every brief carries a Budget block, filled from your
+profile:
+
+| | `lean` | `balanced` | `generous` |
+|---|---|---|---|
+| Tool calls / web calls per agent | 25 / 6 | 40 / 10 | 60 / 15 |
+| Output per call | ~2,000 chars | ~2,000 chars | ~4,000 chars |
+| Read end to end only below | 50 KB | 50 KB | 100 KB |
+
+No images unless the brief asks; bulk text work is done by scripts; downloads go to one
+shared source folder with an index; agents write notes to disk after each step. Before a wave
+the conductor estimates the tokens, a dead agent with a large context gets a new small brief
+instead of a resume, and the job ends with a token table. One measured surprise: the token
+number in a Claude Code task notification is the agent's context at the end, not its usage;
+summed over its transcript, an agent typically processes 25 times that. Details:
+[reference.md](skills/orkestra/reference.md); sources: [docs/research](docs/research/2026-10-token-budget.md).
+What changed and what is still open: [field note](docs/field-notes/2026-10-13-research-budget.md).
+
 ## 📦 What's inside
 
 | Path | |
 |---|---|
-| [`skills/orkestra/SKILL.md`](skills/orkestra/SKILL.md) | The protocol: decision table, flow, brief template, reviewer, model routing, recovery, settings mode |
-| [`skills/orkestra/config.md`](skills/orkestra/config.md) | Config schema and presets |
+| [`skills/orkestra/SKILL.md`](skills/orkestra/SKILL.md) | The protocol: decision table, flow, brief template with budget, reviewer, model routing, recovery |
+| [`skills/orkestra/config.md`](skills/orkestra/config.md) | Config schema, presets and settings mode |
+| [`skills/orkestra/reference.md`](skills/orkestra/reference.md) | Read on demand: reasons and field numbers, helper scripts, Codex notes |
+| [`docs/`](docs) | Research notes (sources with links and reading dates) and field notes from real runs |
 | [`agents/kontrolcu.md`](agents/kontrolcu.md) | Read-only reviewer sub-agent for Claude Code |
 | [`templates/`](templates) | Conductor block and profile presets used by the installer |
 | [`install.ps1`](install.ps1), [`install.sh`](install.sh) | Installers (PowerShell 5.1/7, bash 3.2+) |

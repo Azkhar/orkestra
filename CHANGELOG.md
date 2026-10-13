@@ -1,7 +1,43 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-10-13)
 
+Budgets, from a field run in which two unbudgeted research agents hit the plan's usage limit
+in about 30 minutes after processing 75.5M tokens (numbers in `skills/orkestra/reference.md`,
+sources in `docs/research/2026-10-token-budget.md`).
+
+- Brief template: a Budget block (tool calls, web calls, output per call, whole-file limit,
+  no images unless asked, scripts for bulk text, source index, notes on disk). Profile
+  numbers are ceilings; the brief sizes the budget to the job.
+- "A call budget is not a token budget": tokens ≈ requests × context length; the lever is
+  keeping the context from growing.
+- The Budget block is an instruction; a hard stop needs `maxTurns`, and `kontrolcu` now has
+  `maxTurns: 60`.
+- One shared source cache per job (`<scratch>/sources/INDEX.md`), checked before every
+  download; quotes and numbers come from raw downloads, not from WebFetch (lossy by design).
+- Notes on disk after each major step; a dead agent's work is recovered from them first.
+- Resume policy: read the agent's context size first; small → `SendMessage`, large → a new
+  budgeted brief that points to its files. A sub-agent's prompt cache lives five minutes.
+- Two-tier review: mechanical checks by script first, judgment only on what they flag.
+  `kontrolcu` writes its scripts to scratch, keeps output short and stays within a budget.
+- One plan limit for everyone: a token estimate in the one-line plan before each wave
+  (processed ≈ requests × (start + final context) / 2); `rate_limits` from the status line JSON
+  when it is saved; `lean` runs agents in sequence or at most two; on HTTP 429 nothing new is
+  opened.
+- Token table: the token number in a task notification is the agent's final context, not its
+  usage (measured on 43 runs); processed tokens come from the transcript (script in
+  `reference.md`), dead agents included; totals per wave and tokens per deliverable, written to
+  the project's lessons file.
+- Config: `budget` per profile (`toolCalls`, `webCalls`, `outputChars`, `wholeFileKB`); a
+  config without it falls back to its profile's preset. `tests/check-presets.py` checks the
+  fields, lean ≤ balanced ≤ generous, and that the `config.md` table matches the JSON.
+- New `skills/orkestra/reference.md` (reasons, measured numbers, helper scripts, Codex notes),
+  read on demand; settings-mode steps moved to `config.md`. SKILL.md stays under 17,500
+  characters (rule in `CONTRIBUTING.md`).
+- `docs/research/2026-10-token-budget.md`: sources with reading dates, and the measurements
+  behind the rules.
+- README: a Budgets section and a measured one-line "why" at the top (English and Turkish).
+- `docs/field-notes/2026-10-13-research-budget.md`: the field run as a short case study, including what is still open.
 - CI on Windows (PowerShell 7 and 5.1, Git Bash), Linux and macOS (system bash 3.2).
 - `CONTRIBUTING.md` and a pull request template.
 
