@@ -18,8 +18,8 @@ Install your working copy to try it, without touching your real setup:
 
 ## Tests
 
-Run all of them before opening a pull request. They use a temporary home folder and never
-touch your real `~/.claude`, `~/.agents` or `~/.orkestra`.
+Run all of them before opening a pull request or pushing to `main`. They use a temporary
+home folder and never touch your real `~/.claude`, `~/.agents` or `~/.orkestra`.
 
 ```bash
 pwsh -NoProfile -File tests/test-install.ps1                                   # PowerShell 7
@@ -31,13 +31,17 @@ python3 tests/check-presets.py                                                 #
 CI runs the same on Windows, Linux and macOS (system bash 3.2) for every push and pull request.
 
 **Turn it red.** A new test must fail on the code before your change. Run it against the old
-installer once and say so in the pull request. A test that passes either way measures nothing.
+installer once and say so in the pull request or commit message. A test that passes either
+way measures nothing.
 
 ## How we work
 
-- One branch per change, a pull request into `main`, and the other maintainer reviews it.
-  Nobody approves their own work; this is the same rule the skill teaches.
-- Keep pull requests small. A skill wording change and an installer change are two PRs.
+- Changes come in as a pull request into `main`, from a branch or a fork. A maintainer other
+  than the author reviews it; nobody approves their own pull request.
+- The repository owner ([@Azkhar](https://github.com/Azkhar)) pushes straight to `main`. CI
+  runs the same tests on every push, and a red `main` is fixed before anything else.
+- Keep changes small. A skill wording change and an installer change are two pull requests
+  (or two commits).
 - The skill (`skills/orkestra/SKILL.md`) and all docs are in English. `README.tr.md` is the
   Turkish summary; update it when the README's meaning changes.
 - Every behavior change gets a `CHANGELOG.md` line. Releases are tagged `vX.Y.Z`.
@@ -57,5 +61,5 @@ installer once and say so in the pull request. A test that passes either way mea
   conductor block, and `~/.orkestra/config.json`. Anything else, including user text next to
   the block, stays byte for byte the same. Keep PowerShell 5.1 and bash 3.2 compatibility.
 - **Claims need sources.** If the skill states how Claude Code or Codex behaves, link the
-  official docs in the pull request.
+  official docs in the pull request or commit message.
 - No secrets, no personal paths, no machine-specific settings in commits.

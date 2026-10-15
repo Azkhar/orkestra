@@ -12,4 +12,4 @@
 
 ## Review
 
-The other maintainer reviews before merge. Nobody approves their own work.
+A maintainer other than the author reviews before merge. Nobody approves their own pull request.

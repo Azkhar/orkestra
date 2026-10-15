@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 (2026-10-13)
+## 0.3.0 (2026-10-15)
 
 Budgets, from a field run in which two unbudgeted research agents hit the plan's usage limit
 in about 30 minutes after processing 75.5M tokens (numbers in `skills/orkestra/reference.md`,

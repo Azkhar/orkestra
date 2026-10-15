@@ -209,7 +209,7 @@ fixes were proven by turning six mutants red.
 ## Contributing
 
 Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: tests on
-three shells, "turn it red" for every new test, and a second pair of eyes on every change.
+three shells, "turn it red" for every new test, and a maintainer's review on every pull request.
 
 ## License
 
