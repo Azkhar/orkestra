@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Optional limit guard: `skills/orkestra/hooks/limit-guard.mjs`, a `PreToolUse` hook (Node 18+,
+  no dependencies). From the saved plan usage (status line JSON or `~/.claude/limits.json`) it
+  adds the usage to the conductor's context on every spawn from 70%, denies new agents from
+  90% and lets running agents only write files from 95%, so they save notes and return instead
+  of being cut off. Fails open. Why: in 14 days of field data, 13 of 127 agents were cut off by
+  the session limit after processing 114.3M of 456.6M tokens (25%). Thresholds in
+  `limitGuard` (config.md); install snippet in reference.md; `tests/test-limit-guard.mjs`.
+
 ## 0.3.0 (2026-10-15)
 
 Budgets, from a field run in which two unbudgeted research agents hit the plan's usage limit

@@ -266,7 +266,8 @@ An agent can die mid-task: usage limit, the session closing, a network error, sl
   the one-line plan. If the status line saves its JSON, read
   `rate_limits.five_hour.used_percentage` before and after the first wave and extrapolate.
   Your cap is `maxParallel` (two to four agents fit most jobs); in `lean` run in sequence or
-  at most two. On a 429, section 7.
+  at most two. On a 429, section 7. The optional limit guard hook (reference.md) blocks new
+  agents near the limit and stops running ones before it.
 - **Token table.** One row per agent: model, job, tool calls, duration, final context (the
   token number in its task notification: its context size at the end, not its usage) and
   processed tokens (its transcript summed by the script in reference.md, typically 25×

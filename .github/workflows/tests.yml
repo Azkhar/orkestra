@@ -19,6 +19,8 @@ jobs:
       - name: Installer tests (Git Bash)
         shell: bash
         run: bash tests/test-install.sh
+      - name: Limit guard hook
+        run: node tests/test-limit-guard.mjs
 
   linux:
     runs-on: ubuntu-latest
@@ -28,6 +30,8 @@ jobs:
         run: bash tests/test-install.sh
       - name: Presets in config.md match templates
         run: python3 tests/check-presets.py
+      - name: Limit guard hook
+        run: node tests/test-limit-guard.mjs
 
   macos:
     runs-on: macos-latest

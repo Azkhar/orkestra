@@ -67,6 +67,47 @@ line's JSON input carries `rate_limits.five_hour.used_percentage` and
 saves its input, e.g. `tee ~/.claude/statusline.json | <their status line>`, read that field
 before and after the first wave: the difference is the wave's real price on this plan.
 
+## Limit guard (optional hook)
+
+`hooks/limit-guard.mjs`, installed with the skill, is a `PreToolUse` hook that turns two rules
+into code: open nothing new near the limit, and stop an agent before the limit cuts it off.
+Field data, one user's last 14 days (24 Oct 2026): 127 sub-agents processed 456.6M tokens; 13
+of them were cut off by the session limit, and those 13 had processed 114.3M (25%). Nothing
+told them the limit was close.
+
+It reads the plan usage saved on disk and takes the higher of the 5-hour and 7-day windows:
+
+- **Conductor, Agent/Task call:** from `warnAt` (70) the usage and reset time go into the
+  conductor's context; from `stopAt` (90) the spawn is denied.
+- **Inside a sub-agent** (the hook input has `agent_id`): from `agentStopAt` (95) every tool
+  but Write/Edit/MultiEdit/NotebookEdit is denied, with a message asking for notes and a
+  partial report. Measured with a haiku agent: it wrote its notes file and returned done /
+  left / file paths. Read is denied too, so an agent can update a notes file only if it wrote
+  or read it earlier: one more reason to write notes after every step.
+- **No data, a window that has reset, an unreadable file, any error:** the call goes through.
+
+Data: `~/.claude/statusline.json` (the status line JSON saved with `tee`, above) and
+`~/.claude/limits.json` (`{"five_hour": {"used_percentage": 48, "resets_at": ...}, "seven_day": ...}`),
+or the files listed in `ORKESTRA_LIMITS_FILE` (path-list separator). A reading needs
+`resets_at` (ISO date or epoch seconds); without it there is no telling how old it is, and it
+is ignored. Per window the latest reading wins. A saved reading is a lower bound: within one
+window usage only grows. The hook never calls an API.
+
+Install (Node 18+): add to `~/.claude/settings.json`, with the absolute path of the installed
+skill. Matcher `*`, because sub-agent calls arrive under their own tool names; main-session
+calls other than Agent/Task exit before any file is read.
+
+```json
+{ "hooks": { "PreToolUse": [ { "matcher": "*", "hooks": [ { "type": "command",
+  "command": "node \"/home/me/.claude/skills/orkestra/hooks/limit-guard.mjs\"" } ] } ] } }
+```
+
+On Windows use forward slashes in the path:
+`"command": "node \"C:/Users/me/.claude/skills/orkestra/hooks/limit-guard.mjs\""`.
+
+Thresholds: `limitGuard` in `.orkestra/config.json` (config.md). `ORKESTRA_GUARD=off` turns it
+off for one shell. Tests: `node tests/test-limit-guard.mjs`.
+
 ## Knobs in Claude Code
 
 - `maxTurns` in a custom agent's frontmatter: a hard stop after that many agentic turns. The output comes back marked

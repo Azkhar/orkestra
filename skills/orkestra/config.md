@@ -28,6 +28,8 @@ from `balanced`. The installer writes the user file when it is given `-Profile` 
 | `budget.webCalls` | integer | Most web calls (search, fetch, curl) within `toolCalls`. |
 | `budget.outputChars` | integer | Most characters one call may return into the agent's context; larger output is trimmed (`head`, `grep`, `wc`). |
 | `budget.wholeFileKB` | integer | Files larger than this are searched, never read end to end. |
+| `limitGuard.warnAt` / `.stopAt` / `.agentStopAt` | percent | Optional limit guard hook (reference.md): from `warnAt` the conductor sees the plan usage on every spawn, from `stopAt` new agents are denied, from `agentStopAt` running agents may only write files. Defaults 70 / 90 / 95; not part of the presets. |
+| `limitGuard.enabled` | `true` / `false` | `false` turns the hook off for this project or user. |
 
 The budget goes into every brief's Budget block (SKILL.md section 4). It caps calls, not
 tokens: every request resends the agent's whole context, so the output and file-size caps

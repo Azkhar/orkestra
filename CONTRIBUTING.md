@@ -26,6 +26,7 @@ pwsh -NoProfile -File tests/test-install.ps1                                   #
 powershell -NoProfile -ExecutionPolicy Bypass -File tests/test-install.ps1     # Windows PowerShell 5.1
 bash tests/test-install.sh                                                     # bash (Linux, macOS, Git Bash)
 python3 tests/check-presets.py                                                 # config.md presets == templates
+node tests/test-limit-guard.mjs                                                # limit guard hook
 ```
 
 CI runs the same on Windows, Linux and macOS (system bash 3.2) for every push and pull request.

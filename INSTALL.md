@@ -77,6 +77,8 @@ global skill and conductor mode, run the installer twice: once `-Scope Global`, 
 - List what was installed and where. For conductor mode, show the block that was added.
 - Tell the user: open a new session so the skill and the project instructions load;
   `/orkestra settings` (Codex: `$orkestra settings`) changes the profile at any time.
+- Claude Code only: mention the optional limit guard hook (`skills/orkestra/reference.md`,
+  "Limit guard"). It needs a hooks block in the user's `settings.json`; add it only if they ask.
 - Don't commit. If conductor mode wrote to `AGENTS.md` / `CLAUDE.md`, the user decides whether
   to commit it; if it wrote `CLAUDE.local.md`, suggest adding it to `.gitignore`.
 - If you cloned into a temp folder, you may delete that folder.
