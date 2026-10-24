@@ -9,7 +9,7 @@
 //     file writes, so the agent saves its notes and returns before the limit cuts it off.
 // No data, an unreadable file or any error: the call goes through (fail open).
 // Install and thresholds: reference.md, "Limit guard".
-import { readFileSync } from 'node:fs'
+import { readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { delimiter, join } from 'node:path'
 
@@ -48,9 +48,12 @@ function resetMs(v) {
 }
 
 // Accepts the status line JSON ({rate_limits: {five_hour: ...}}) or a flat {five_hour: ...}.
-// Per window the freshest reading wins: a later reset is a newer window; within one window
-// usage only grows, so the higher number is the newer one. A reading without resets_at, or
-// whose window has already reset, is dropped: there is no way to tell how old it is.
+// Per window the freshest reading wins. Within one window usage only grows, so the higher
+// number is the newer one. Two files that describe different windows: the file written last
+// wins (ties: the later reset). A window that is still running only gets replaced by a newer
+// observation, e.g. after an account switch; a later reset alone doesn't prove it is newer.
+// A reading without resets_at, or whose window has already reset, is dropped: there is no way
+// to tell how old it is.
 function readings(now) {
   const files = process.env.ORKESTRA_LIMITS_FILE
     ? process.env.ORKESTRA_LIMITS_FILE.split(delimiter).filter(Boolean)
@@ -59,6 +62,10 @@ function readings(now) {
   for (const f of files) {
     const j = readJson(f)
     if (!j || typeof j !== 'object') continue
+    let mtime = 0
+    try {
+      mtime = statSync(f).mtimeMs
+    } catch {}
     const src = j.rate_limits && typeof j.rate_limits === 'object' ? j.rate_limits : j
     for (const w of ['five_hour', 'seven_day']) {
       const r = src[w]
@@ -66,9 +73,10 @@ function readings(now) {
       const at = resetMs(r.resets_at)
       if (at === null || at <= now) continue
       const cur = best[w]
-      const newer = !cur || at - cur.at > SAME_WINDOW_MS
-      const sameAndHigher = cur && Math.abs(at - cur.at) <= SAME_WINDOW_MS && r.used_percentage > cur.pct
-      if (newer || sameAndHigher) best[w] = { pct: r.used_percentage, at }
+      const sameWindow = cur && Math.abs(at - cur.at) <= SAME_WINDOW_MS
+      const take = !cur ||
+        (sameWindow ? r.used_percentage > cur.pct : mtime > cur.mtime || (mtime === cur.mtime && at > cur.at))
+      if (take) best[w] = { pct: r.used_percentage, at, mtime }
     }
   }
   return best

@@ -90,8 +90,10 @@ Data: `~/.claude/statusline.json` (the status line JSON saved with `tee`, above)
 `~/.claude/limits.json` (`{"five_hour": {"used_percentage": 48, "resets_at": ...}, "seven_day": ...}`),
 or the files listed in `ORKESTRA_LIMITS_FILE` (path-list separator). A reading needs
 `resets_at` (ISO date or epoch seconds); without it there is no telling how old it is, and it
-is ignored. Per window the latest reading wins. A saved reading is a lower bound: within one
-window usage only grows. The hook never calls an API.
+is ignored. Per window: within one window the higher number wins (usage only grows, so a saved
+reading is a lower bound); readings of different windows, e.g. after an account switch, go to
+the file written last. A writer should save only the current account's reading. The hook
+never calls an API.
 
 Install (Node 18+): add to `~/.claude/settings.json`, with the absolute path of the installed
 skill. Matcher `*`, because sub-agent calls arrive under their own tool names; main-session

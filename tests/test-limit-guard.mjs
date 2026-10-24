@@ -2,7 +2,7 @@
 // Calistir: node tests/test-limit-guard.mjs  (cikis 0 = hepsi gecti, 1 = hata var)
 // LIMIT_GUARD_HOOK ile baska bir hook dosyasi denenebilir (ornegin bos bir dosyayla testin kirmiziya dondugunu gormek icin).
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,9 +19,14 @@ const H = 3600 * 1000
 const inFuture = ms => new Date(Date.now() + ms).toISOString()
 const epochIn = ms => Math.floor((Date.now() + ms) / 1000)
 let n = 0
-function limits(name, obj) {
+// ageSec: dosyanin kac saniye once yazilmis gibi gorunecegi (mtime)
+function limits(name, obj, ageSec = 0) {
   const p = join(tmp, `${name}-${++n}.json`)
   writeFileSync(p, JSON.stringify(obj))
+  if (ageSec) {
+    const t = new Date(Date.now() - ageSec * 1000)
+    utimesSync(p, t, t)
+  }
   return p
 }
 const flat = (five, seven = 10, at = inFuture(2 * H)) => ({
@@ -95,13 +100,26 @@ try {
       decision(r.out) === 'deny' && /91%/.test(reason(r.out)))
   }
 
-  // Farkli pencere: eski pencerenin %95'i, yeni pencerenin %10'u -> yeni kazanir
-  const old = limits('old', { five_hour: { used_percentage: 95, resets_at: inFuture(0.5 * H) } })
+  // Farkli pencere: son yazilan dosya kazanir. Yeni pencere (%10) sonra yazildi -> gecer
+  const old = limits('old', { five_hour: { used_percentage: 95, resets_at: inFuture(0.5 * H) } }, 600)
   const fresh = limits('new', { five_hour: { used_percentage: 10, resets_at: epochIn(4.5 * H) } })
   for (const order of [[old, fresh], [fresh, old]]) {
     r = run(spawn, { files: order })
-    check(`daha gec sifirlanan pencere kazanir, sira ${order[0] === old ? 'eski>yeni' : 'yeni>eski'}`, r.out === null)
+    check(`farkli pencerede son yazilan kazanir (yeni pencere), sira ${order[0] === old ? 'eski>yeni' : 'yeni>eski'}`, r.out === null)
   }
+
+  // Hesap degisimi: eski hesabin %94'u daha GEC sifirlaniyor ama daha once yazildi; yeni hesabin %9'u sonra yazildi.
+  // "Gec sifirlanan kazanir" kurali burada eski hesabi secip yanlis engellerdi.
+  const prevAcct = limits('acctA', { five_hour: { used_percentage: 94, resets_at: inFuture(27 * 60 * 1000) } }, 300)
+  const newAcct = limits('acctB', { rate_limits: { five_hour: { used_percentage: 9, resets_at: epochIn(17 * 60 * 1000) } } })
+  for (const order of [[prevAcct, newAcct], [newAcct, prevAcct]]) {
+    r = run(spawn, { files: order })
+    check(`hesap degisimi: son yazilan hesap kazanir, sira ${order[0] === prevAcct ? 'eski>yeni' : 'yeni>eski'}`, r.out === null)
+  }
+  const prevLater = limits('acctA2', { five_hour: { used_percentage: 94, resets_at: inFuture(27 * 60 * 1000) } })
+  const newEarlier = limits('acctB2', { five_hour: { used_percentage: 9, resets_at: inFuture(17 * 60 * 1000) } }, 300)
+  r = run(spawn, { files: [newEarlier, prevLater] })
+  check('farkli pencere, %94 sonra yazildiysa o kazanir: engellenir', decision(r.out) === 'deny')
 
   r = run(spawn, { files: [limits('nodate', { five_hour: { used_percentage: 95 } })] })
   check('resets_at olmayan okuma yok sayilir', r.out === null)
